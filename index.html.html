@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Agri-Flood | RiskIntel Precision Monitoring</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #12101a;
+  --sidebar: #16131f;
+  --panel: #1e1a2a;
+  --panel2: #282236;
+  --border: rgba(220,190,220,0.09);
+  --border2: rgba(220,190,220,0.16);
+  --text: #f5f0f7;
+  --text2: #b5a8bc;
+  --muted: #7a6e85;
+  --accent: #e8a0bf;
+  --accent-dim: rgba(232,160,191,0.16);
+  --cyan: #9b8ec4;
+  --red: #e87a8a;
+  --red-dim: rgba(232,122,138,0.14);
+  --orange: #e8b47a;
+  --orange-dim: rgba(232,180,122,0.14);
+  --green: #8ec4a8;
+  --green-dim: rgba(142,196,168,0.14);
+  --yellow: #e8d08a;
+  --purple: #c4a0e8;
+  --radius: 14px;
+  --font: 'Inter', system-ui, -apple-system, sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:var(--bg);color:var(--text);height:100vh;overflow:hidden;display:flex}
+
+/* SIDEBAR */
+.sidebar{width:210px;background:var(--sidebar);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;z-index:50}
+.sb-brand{padding:18px 16px 14px;display:flex;align-items:center;gap:10px}
+.sb-brand .mark{width:30px;height:30px;background:linear-gradient(135deg,#e8a0bf,#9b8ec4);border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:.75rem;color:#fff}
+.sb-brand .sb-name{font-weight:700;font-size:.88rem;letter-spacing:-.02em}
+.sb-brand .sb-sub{font-size:.6rem;color:var(--muted);margin-top:1px;letter-spacing:.02em}
+.sb-nav{flex:1;padding:6px 8px;display:flex;flex-direction:column;gap:1px}
+.sb-nav button{display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border:none;background:transparent;color:var(--text2);font-family:inherit;font-size:.78rem;font-weight:500;border-radius:8px;cursor:pointer;text-align:left;transition:.15s}
+.sb-nav button:hover{background:rgba(255,255,255,0.035);color:var(--text)}
+.sb-nav button.active{background:var(--accent-dim);color:var(--accent)}
+.sb-nav button .ico{width:18px;text-align:center;font-size:.9rem;opacity:.85}
+.sb-foot{padding:12px 12px 16px;border-top:1px solid var(--border)}
+.export-btn{width:100%;padding:9px;border:1px solid var(--border2);border-radius:8px;background:transparent;color:var(--text2);font-family:inherit;font-size:.75rem;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px;transition:.15s}
+.export-btn:hover{border-color:var(--accent);color:var(--accent)}
+
+/* MAIN */
+.main{flex:1;display:flex;flex-direction:column;min-width:0;overflow:hidden}
+.header{height:50px;border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 22px;gap:20px;background:var(--bg);flex-shrink:0}
+.hdr-brand{display:flex;align-items:center;gap:7px;font-weight:700;font-size:.9rem}
+.hdr-brand .drop{width:20px;height:20px;background:linear-gradient(135deg,#e8a0bf,#9b8ec4);border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:.65rem}
+.hdr-tabs{display:flex;gap:2px}
+.hdr-tabs button{padding:6px 13px;border:none;background:transparent;color:var(--text2);font-family:inherit;font-size:.75rem;font-weight:600;cursor:pointer;letter-spacing:.03em;transition:.15s;border-bottom:2px solid transparent}
+.hdr-tabs button:hover{color:var(--text)}
+.hdr-tabs button.active{color:var(--accent);border-bottom-color:var(--accent)}
+.hdr-right{margin-left:auto;display:flex;align-items:center;gap:10px}
+.crit-badge{background:var(--red-dim);color:var(--red);font-size:.65rem;font-weight:700;padding:4px 9px;border-radius:5px;letter-spacing:.04em;display:flex;align-items:center;gap:5px}
+.crit-badge::before{content:'';width:5px;height:5px;background:var(--red);border-radius:50%;animation:pulse 1.5s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.hdr-icon{width:30px;height:30px;border-radius:7px;border:1px solid var(--border);background:var(--panel);display:flex;align-items:center;justify-content:center;color:var(--text2);cursor:pointer;font-size:.8rem}
+.hdr-icon:hover{border-color:var(--border2);color:var(--text)}
+.avatar{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#e8a0bf,#9b8ec4);display:flex;align-items:center;justify-content:center;font-size:.65rem;font-weight:700;color:#fff;cursor:pointer}
+
+.content{flex:1;overflow-y:auto;padding:18px 22px 28px}
+.page-head{display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:16px}
+.page-head h1{font-size:1.25rem;font-weight:700;letter-spacing:-.02em}
+.page-head p{font-size:.78rem;color:var(--text2);margin-top:2px}
+.live-sync{display:inline-flex;align-items:center;gap:5px;font-size:.68rem;color:var(--green);font-weight:600}
+.live-sync::before{content:'';width:5px;height:5px;background:var(--green);border-radius:50%;box-shadow:0 0 5px var(--green)}
+
+/* KPIs */
+.kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:11px;margin-bottom:14px}
+@media(max-width:1100px){.kpi-row{grid-template-columns:repeat(2,1fr)}}
+.kpi{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px}
+.kpi .kpi-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.kpi .kpi-ico{width:30px;height:30px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:.9rem}
+.kpi .kpi-label{font-size:.65rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.kpi .kpi-val{font-size:1.4rem;font-weight:800;letter-spacing:-.03em;line-height:1.15}
+.kpi .kpi-sub{font-size:.7rem;color:var(--text2);margin-top:2px}
+.kpi .kpi-change{font-size:.7rem;font-weight:600;margin-top:3px}
+.kpi .kpi-change.down{color:var(--red)}
+
+/* Grid */
+.dash-grid{display:grid;grid-template-columns:1.45fr .95fr;gap:12px}
+@media(max-width:1000px){.dash-grid{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:14px}
+.card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.card-head h3{font-size:.84rem;font-weight:650}
+.card-head .action{font-size:.68rem;color:var(--text2);cursor:pointer;display:flex;align-items:center;gap:3px}
+.card-head .action:hover{color:var(--accent)}
+
+.map-shell{position:relative;border-radius:16px;overflow:hidden;border:1px solid var(--border);
+  background:#1a241c;box-shadow:0 6px 28px rgba(0,0,0,.25)}
+#map,#mapFull{height:380px;width:100%;background:#dce5d4}
+#mapFull{height:480px}
+.map-caption{font-size:.7rem;color:var(--muted);margin-bottom:8px;display:flex;align-items:center;gap:8px;font-weight:600}
+.map-caption::before{content:'';width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green)}
+.map-toolbar{position:absolute;top:12px;left:12px;z-index:600;display:flex;gap:6px}
+.map-tool{background:rgba(26,36,28,.92);backdrop-filter:blur(12px);border:1px solid var(--border);border-radius:10px;padding:5px;display:flex;gap:3px;box-shadow:0 4px 14px rgba(0,0,0,.25)}
+.map-tool button{font-family:var(--font);font-size:.66rem;font-weight:650;padding:5px 10px;border-radius:7px;border:none;background:transparent;color:var(--text2);cursor:pointer;transition:.15s}
+.map-tool button:hover{color:var(--text);background:rgba(255,255,255,0.06)}
+.map-tool button.on{background:var(--accent-dim);color:var(--accent)}
+.map-float-legend{position:absolute;bottom:14px;right:14px;z-index:600;background:rgba(26,36,28,.92);backdrop-filter:blur(12px);border:1px solid var(--border);border-radius:12px;padding:12px 14px;font-size:.68rem;color:var(--text2);box-shadow:0 4px 16px rgba(0,0,0,.28);min-width:140px}
+.map-float-legend .mfl-title{font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:7px}
+.map-float-legend span{display:flex;align-items:center;gap:7px;padding:3px 0}
+.map-float-legend i{width:10px;height:10px;border-radius:3px;display:inline-block}
+/* Soft glow blob markers */
+.af-blob{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;position:relative}
+.af-blob::before{content:'';position:absolute;inset:0;border-radius:50%;background:inherit;opacity:.35;filter:blur(6px);transform:scale(1.4)}
+.af-blob .core{width:12px;height:12px;border-radius:50%;background:inherit;border:2px solid rgba(255,255,255,.85);box-shadow:0 1px 4px rgba(0,0,0,.35);position:relative;z-index:1}
+.af-blob.crit .core{width:14px;height:14px}
+.af-blob.crit::after{content:'';position:absolute;inset:-4px;border-radius:50%;border:2px solid currentColor;opacity:.5;animation:blob-ring 2s ease-out infinite}
+@keyframes blob-ring{0%{transform:scale(.8);opacity:.6}100%{transform:scale(1.5);opacity:0}}
+.leaflet-popup-content-wrapper{background:var(--panel)!important;color:var(--text)!important;border-radius:14px!important;border:1px solid var(--border)!important;font-family:var(--font)!important;box-shadow:0 10px 36px rgba(0,0,0,.35)!important}
+.leaflet-popup-tip{background:var(--panel)!important}
+.leaflet-popup-content{margin:12px 14px!important;font-size:.8rem!important;line-height:1.5!important;min-width:200px}
+.popup-title{font-weight:700;font-size:.92rem;margin-bottom:3px}
+.popup-meta{color:var(--text2);font-size:.74rem;margin-bottom:8px}
+.popup-row{display:flex;justify-content:space-between;align-items:center}
+.popup-bar{height:6px;border-radius:4px;background:rgba(255,255,255,.08);overflow:hidden;margin:6px 0 2px}
+.popup-fill{height:100%;border-radius:4px}
+.leaflet-control-zoom{border:none!important;box-shadow:0 3px 12px rgba(0,0,0,.25)!important;margin-bottom:14px!important;margin-right:14px!important}
+.leaflet-control-zoom a{background:var(--panel)!important;color:var(--text)!important;border:1px solid var(--border)!important;width:32px!important;height:32px!important;line-height:32px!important;border-radius:8px!important;font-size:14px!important}
+.leaflet-control-zoom a:hover{background:var(--panel2)!important}
+
+/* Scenario */
+.ssp-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:12px}
+.ssp-btn{padding:9px;border:1px solid var(--border);border-radius:7px;background:var(--panel2);color:var(--text2);font-family:inherit;font-size:.72rem;font-weight:600;cursor:pointer;text-align:center;transition:.15s}
+.ssp-btn:hover{border-color:var(--border2);color:var(--text)}
+.ssp-btn.active{border-color:var(--accent);background:var(--accent-dim);color:var(--accent)}
+.lbl{font-size:.65rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px}
+.horizon-slider{width:100%;accent-color:var(--accent);margin:2px 0}
+.horizon-ticks{display:flex;justify-content:space-between;font-size:.65rem;color:var(--muted);margin-bottom:12px}
+.run-btn{width:100%;padding:10px;border:none;border-radius:8px;background:var(--accent);color:#fff;font-family:inherit;font-size:.8rem;font-weight:650;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px;transition:.15s}
+.run-btn:hover{filter:brightness(1.1)}
+
+/* Vulnerability */
+.vuln-item{display:grid;grid-template-columns:22px 1fr 36px 64px;align-items:center;gap:7px;padding:9px 0;border-bottom:1px solid var(--border)}
+.vuln-item:last-child{border-bottom:none}
+.vuln-item .v-ico{font-size:.85rem;text-align:center}
+.vuln-item .v-name{font-size:.78rem;font-weight:550}
+.vuln-item .v-idx{font-size:.78rem;font-weight:700;text-align:right;font-variant-numeric:tabular-nums}
+.vuln-item .v-bar{height:4px;border-radius:2px;background:rgba(255,255,255,0.06);overflow:hidden}
+.vuln-item .v-fill{height:100%;border-radius:2px}
+.view-all{display:block;text-align:center;font-size:.7rem;font-weight:600;color:var(--accent);margin-top:8px;cursor:pointer;text-decoration:none}
+.view-all:hover{text-decoration:underline}
+
+/* Tab views */
+.tab-view{display:none}
+.tab-view.active{display:block}
+.sb-view{display:none}
+.sb-view.active{display:block}
+
+/* Tables */
+.tbl-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:9px;margin-top:10px}
+table{width:100%;border-collapse:collapse;font-size:.78rem}
+th{text-align:left;padding:9px 11px;color:var(--muted);font-weight:600;font-size:.65rem;text-transform:uppercase;letter-spacing:.04em;background:var(--panel2);border-bottom:1px solid var(--border);white-space:nowrap}
+td{padding:9px 11px;border-bottom:1px solid var(--border);color:var(--text2)}
+tr:hover td{background:rgba(255,255,255,0.015)}
+.band-tag{display:inline-block;padding:2px 7px;border-radius:9px;font-size:.65rem;font-weight:650}
+
+/* Chart cards */
+.chart-card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:12px}
+.chart-card canvas{max-height:240px}
+
+/* Forecast cards */
+.fc-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-bottom:14px}
+.fc-card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:14px}
+.fc-card .fc-label{font-size:.65rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.fc-card .fc-val{font-size:1.3rem;font-weight:800;margin-top:4px;letter-spacing:-.02em}
+.fc-card .fc-sub{font-size:.7rem;color:var(--text2);margin-top:2px}
+
+
+
+@media(max-width:768px){
+  .sidebar{display:none}
+  .kpi-row{grid-template-columns:1fr 1fr}
+  .dash-grid{grid-template-columns:1fr}
+  .header{padding:0 10px;gap:8px}
+  .content{padding:12px 10px}
+  .hdr-tabs button{padding:5px 8px;font-size:.68rem}
+}
+</style>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="sb-brand">
+    <div class="mark">RI</div>
+    <div><div class="sb-name">RiskIntel</div><div class="sb-sub">Precision Monitoring</div></div>
+  </div>
+  <nav class="sb-nav">
+    <button data-sb="assets"><span class="ico">▣</span> ASSETS</button>
+    <button data-sb="portfolio"><span class="ico">◫</span> PORTFOLIO</button>
+    <button class="active" data-sb="dashboard"><span class="ico">◎</span> RISK MODELS</button>
+    <button data-sb="history"><span class="ico">◷</span> CLIMATE HISTORY</button>
+    <button data-sb="settings"><span class="ico">⚙</span> SETTINGS</button>
+  </nav>
+  <div class="sb-foot">
+    <button class="export-btn" onclick="exportCSV()">↓ EXPORT DATA</button>
+  </div>
+</aside>
+
+<div class="main">
+  <header class="header">
+    <div class="hdr-brand"><div class="drop">💧</div> Agri-Flood</div>
+    <div class="hdr-tabs" id="hdrTabs">
+      <button class="active" data-tab="dashboard">DASHBOARD</button>
+      <button data-tab="heatmaps">HEATMAPS</button>
+      <button data-tab="reports">REPORTS</button>
+      <button data-tab="forecasts">FORECASTS</button>
+    </div>
+    <div class="hdr-right">
+      <div class="crit-badge" id="critBadge">CRITICAL ALERT</div>
+      <div class="hdr-icon" title="Notifications">🔔</div>
+      <div class="avatar">U</div>
+    </div>
+  </header>
+
+  <div class="content">
+    <!-- ════ DASHBOARD ════ -->
+    <div class="tab-view active" id="tab-dashboard">
+      <div class="page-head">
+        <div><h1>System Overview</h1><p>Real-time monitoring of agricultural assets across Pakistan regions.</p></div>
+        <div class="live-sync">Live Feed Sync</div>
+      </div>
+      <div class="kpi-row">
+        <div class="kpi">
+          <div class="kpi-top"><div class="kpi-ico" style="background:var(--accent-dim);color:var(--accent)">🏛</div></div>
+          <div class="kpi-label">Total Assets</div>
+          <div class="kpi-val" id="kpiAssets">—</div>
+          <div class="kpi-sub">PKR portfolio value</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-top"><div class="kpi-ico" style="background:var(--red-dim);color:var(--red)">📉</div></div>
+          <div class="kpi-label">Physical VaR</div>
+          <div class="kpi-val" style="color:var(--red)" id="kpiVaR">—</div>
+          <div class="kpi-change down" id="kpiVaRChange">High + Critical exposure</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-top"><div class="kpi-ico" style="background:var(--orange-dim);color:var(--orange)">⚠</div></div>
+          <div class="kpi-label">High / Critical</div>
+          <div class="kpi-val" id="kpiHigh">—</div>
+          <div class="kpi-sub">Locations at risk</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-top"><div class="kpi-ico" style="background:rgba(45,212,191,0.12);color:var(--cyan)">💧</div></div>
+          <div class="kpi-label">Primary Hazard</div>
+          <div class="kpi-val" style="font-size:1.15rem" id="kpiHazard">Flood</div>
+          <div class="kpi-sub">Monsoon Sys. · PDNA 2022</div>
+        </div>
+      </div>
+      <div class="dash-grid">
+        <div class="card">
+          <div class="card-head"><h3>Risk Heatmap</h3><span class="action" onclick="map&&map.invalidateSize()">⛶ EXPAND</span></div>
+          <div class="map-caption">Pakistan | Current Flood Situation</div>
+          <div class="map-shell">
+            <div id="map"></div>
+            <div class="map-toolbar">
+              <div class="map-tool">
+                <button type="button" id="btnHeat" title="Risk heatmap">Heat</button>
+                <button type="button" id="btnFlood" title="Indus flood zone">Flood</button>
+                <button type="button" id="btnSat" title="Cycle basemap">Base</button>
+              </div>
+            </div>
+            <div class="map-float-legend">
+              <div class="mfl-title">Vulnerability Index</div>
+              <span><i style="background:#e87a8a"></i> Critical (&gt;80%)</span>
+              <span><i style="background:#e8b47a"></i> High (60–80%)</span>
+              <span><i style="background:#e8d08a"></i> Elevated (55–70%)</span>
+              <span><i style="background:#8ec4a8"></i> Moderate (40–60%)</span>
+              <span><i style="background:#9b8ec4"></i> Low (&lt;40%)</span>
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <div class="card">
+            <div class="card-head"><h3>Scenario Parameters</h3></div>
+            <div class="lbl">Climate Pathway (SSP)</div>
+            <div class="ssp-grid" id="scenarioPills">
+              <button class="ssp-btn" data-v="ssp126">SSP1-2.6</button>
+              <button class="ssp-btn" data-v="ssp245">SSP2-4.5</button>
+              <button class="ssp-btn active" data-v="ssp585">SSP5-8.5</button>
+              <button class="ssp-btn" data-v="historical">Historical</button>
+            </div>
+            <div class="lbl">Projection Horizon</div>
+            <input type="range" class="horizon-slider" id="horizonSlider" min="0" max="3" step="1" value="0"/>
+            <div class="horizon-ticks"><span>2030</span><span>2040</span><span>2060</span><span>2100</span></div>
+            <button class="run-btn" id="runSim">▶ Run Simulation</button>
+          </div>
+          <div class="card">
+            <div class="card-head"><h3>Asset Vulnerability</h3></div>
+            <div id="vulnList"></div>
+            <a class="view-all" href="#" id="viewComplete">VIEW COMPLETE INDEX →</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════ HEATMAPS ════ -->
+    <div class="tab-view" id="tab-heatmaps">
+      <div class="page-head">
+        <div><h1>Risk Heatmaps</h1><p>Spatial distribution of physical climate risk across farm assets.</p></div>
+      </div>
+      <div class="card" style="margin-bottom:12px">
+        <div class="card-head"><h3>Full-screen Risk Map</h3></div>
+        <div class="map-shell">
+          <div id="mapFull"></div>
+          <div class="map-float-legend">
+            <div class="mfl-title">Vulnerability Index</div>
+            <span><i style="background:#e87a8a"></i> Critical</span>
+            <span><i style="background:#e8b47a"></i> High</span>
+            <span><i style="background:#e8d08a"></i> Elevated</span>
+            <span><i style="background:#8ec4a8"></i> Moderate</span>
+            <span><i style="background:#9b8ec4"></i> Low</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════ REPORTS ════ -->
+    <div class="tab-view" id="tab-reports">
+      <div class="page-head">
+        <div><h1>Reports</h1><p>Exportable risk summaries and PDNA-linked methodology.</p></div>
+        <button class="run-btn" style="width:auto;padding:8px 14px;font-size:.75rem" onclick="exportCSV()">↓ Export CSV</button>
+      </div>
+      <div class="kpi-row" style="margin-bottom:14px">
+        <div class="kpi"><div class="kpi-label">Farms Assessed</div><div class="kpi-val" id="rptFarms">—</div></div>
+        <div class="kpi"><div class="kpi-label">Avg Portfolio Risk</div><div class="kpi-val" id="rptAvg">—</div></div>
+        <div class="kpi"><div class="kpi-label">High+Critical Value</div><div class="kpi-val" style="color:var(--red)" id="rptVaR">—</div></div>
+        <div class="kpi"><div class="kpi-label">Scenario</div><div class="kpi-val" style="font-size:1rem" id="rptScen">—</div></div>
+      </div>
+      <div class="card" style="margin-bottom:12px">
+        <div class="card-head"><h3>Methodology</h3></div>
+        <p style="color:var(--text2);font-size:.82rem;line-height:1.65">
+          <strong style="color:var(--text)">Source:</strong> Pakistan Floods 2022 Post-Disaster Needs Assessment (GoP + World Bank + FAO + UN + ADB).
+        </p>
+        <pre style="background:var(--panel2);padding:12px;border-radius:8px;font-size:.72rem;color:var(--cyan);margin-top:10px;overflow-x:auto;line-height:1.6">Risk = (WeightFactor × 0.60) + (ValueExposure × 0.20) + (LocationFlood × 0.20)
+then × ScenarioMultiplier × HorizonMultiplier</pre>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-top:12px">
+          <div style="background:var(--panel2);border-radius:8px;padding:10px"><div style="font-weight:700;color:var(--yellow)">$3.7B</div><div style="font-size:.65rem;color:var(--muted)">Agri damage</div></div>
+          <div style="background:var(--panel2);border-radius:8px;padding:10px"><div style="font-weight:700;color:var(--yellow)">$9.2B</div><div style="font-size:.65rem;color:var(--muted)">Agri loss</div></div>
+          <div style="background:var(--panel2);border-radius:8px;padding:10px"><div style="font-weight:700;color:var(--yellow)">82%</div><div style="font-size:.65rem;color:var(--muted)">Crops share</div></div>
+          <div style="background:var(--panel2);border-radius:8px;padding:10px"><div style="font-weight:700;color:var(--yellow)">4.41M</div><div style="font-size:.65rem;color:var(--muted)">Acres damaged</div></div>
+        </div>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Location</th><th>Type</th><th>Value</th><th>Risk</th><th>Band</th></tr></thead>
+          <tbody id="rptTable"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ════ FORECASTS ════ -->
+    <div class="tab-view" id="tab-forecasts">
+      <div class="page-head">
+        <div><h1>Forecasts</h1><p>Portfolio risk trajectory across climate pathways and time horizons.</p></div>
+      </div>
+      <div class="fc-grid" id="fcCards"></div>
+      <div class="chart-card">
+        <div class="card-head"><h3>Avg Portfolio Risk by Horizon</h3></div>
+        <canvas id="forecastChart"></canvas>
+      </div>
+    </div>
+
+    <!-- Sidebar-driven views (overlay when not on RISK MODELS) -->
+    <div class="sb-view" id="sb-assets">
+      <div class="page-head">
+        <div><h1>Asset Inventory</h1><p>Named farms with public siting · PDNA-linked risk scores</p></div>
+        <button class="run-btn" style="width:auto;padding:7px 14px;font-size:.75rem" onclick="document.getElementById('csvFile').click()">↑ Import CSV</button>
+        <input type="file" id="csvFile" accept=".csv" style="display:none"/>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Location</th><th>Asset Type</th><th>Value (PKR)</th><th>Lat</th><th>Long</th><th>Weight</th><th>Risk</th><th>Band</th></tr></thead>
+          <tbody id="assetTable"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="sb-view" id="sb-portfolio">
+      <div class="page-head"><div><h1>Portfolio</h1><p>Aggregated exposure by asset type.</p></div></div>
+      <div class="card" id="rankList"></div>
+    </div>
+
+    <div class="sb-view" id="sb-history">
+      <div class="page-head"><div><h1>Climate History</h1><p>PDNA 2022 baseline and historical flood context.</p></div></div>
+      <div class="card">
+        <p style="color:var(--text2);font-size:.84rem;line-height:1.7">
+          <strong style="color:var(--text)">Source of truth:</strong> Pakistan Floods 2022 Post-Disaster Needs Assessment.<br><br>
+          Agriculture damage <strong style="color:var(--text)">USD 3.7B</strong> · Loss <strong style="color:var(--text)">USD 9.2B</strong><br>
+          Crops 82% · Livestock 17% · Land damaged 4.41M acres · Livestock lost ~0.8–1.1M
+        </p>
+      </div>
+    </div>
+
+    <div class="sb-view" id="sb-settings">
+      <div class="page-head"><div><h1>Settings</h1><p>Model configuration.</p></div></div>
+      <div class="card">
+        <p style="color:var(--text2);font-size:.84rem;line-height:1.6">
+          Risk model locked to PDNA 2022 weights. CSV columns:
+          <code style="color:var(--cyan)">location, asset_type, value, latitude, longitude</code>
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══ RISK MODEL — UNCHANGED ═══
+const WEIGHTS={crops:55,crop:55,cotton:55,rice:55,sugarcane:55,wheat:55,maize:55,livestock:20,animals:20,cattle:20,buffalo:20,irrigation:12,canal:12,'tube well':12,tubewell:12,soil:8,land:8,machinery:3,equipment:3,tractor:3,storage:2,warehouse:2,godown:2,fisheries:2,pond:2};
+const SCENARIO={historical:1.0,ssp126:1.06,ssp245:1.18,ssp585:1.38};
+const HORIZON={near:1.0,short:1.08,medium:1.18,long:1.32};
+const HORIZON_KEYS=['near','short','medium','long'];
+let scenario='ssp585',horizon='near',assets=[];
+let map,layer,mapFull,layerFull,forecastChart;
+
+function w(t){return WEIGHTS[(t||'').toLowerCase().trim()]||10}
+function band(s){if(s<=30)return{n:'Low',c:'#8ec4a8',cls:'low'};if(s<=55)return{n:'Moderate',c:'#9b8ec4',cls:'moderate'};if(s<=70)return{n:'Elevated',c:'#e8d08a',cls:'elevated'};if(s<=85)return{n:'High',c:'#e8b47a',cls:'high'};return{n:'Critical',c:'#e87a8a',cls:'critical'}}
+function locFactor(lat){if(lat<27)return 90;if(lat<28.5)return 78;if(lat<30)return 62;if(lat<32)return 45;if(lat<34)return 32;return 20}
+function calc(a){const wf=(w(a.asset_type)/55)*100;const vf=Math.min(100,Math.log10((+a.value||0)+10)*11);const lf=locFactor(+a.latitude||30);let r=wf*.6+vf*.2+lf*.2;r*=SCENARIO[scenario]*HORIZON[horizon];return Math.min(100,Math.max(0,Math.round(r)))}
+
+const SAMPLE=[
+  {location:"Jacobabad Cotton Farm",asset_type:"Crops",value:14500000,latitude:28.28,longitude:68.44},
+  {location:"Larkana Rice Estate",asset_type:"Crops",value:11200000,latitude:27.56,longitude:68.21},
+  {location:"Sukkur Livestock Herd",asset_type:"Livestock",value:6800000,latitude:27.70,longitude:68.86},
+  {location:"Hyderabad Irrigation",asset_type:"Irrigation",value:4200000,latitude:25.40,longitude:68.37},
+  {location:"Thatta Sugarcane",asset_type:"Crops",value:9800000,latitude:24.75,longitude:67.92},
+  {location:"Badin Fisheries",asset_type:"Fisheries",value:1850000,latitude:24.66,longitude:68.84},
+  {location:"Multan Storage",asset_type:"Storage",value:3100000,latitude:30.16,longitude:71.52},
+  {location:"Bahawalpur Machinery",asset_type:"Machinery",value:2450000,latitude:29.40,longitude:71.68},
+  {location:"DG Khan Livestock",asset_type:"Livestock",value:7200000,latitude:30.05,longitude:70.64},
+  {location:"Rahim Yar Khan Cotton",asset_type:"Crops",value:16800000,latitude:28.42,longitude:70.30},
+  {location:"Sibi Crops",asset_type:"Crops",value:5600000,latitude:29.55,longitude:67.88},
+  {location:"Quetta Livestock",asset_type:"Livestock",value:2900000,latitude:30.18,longitude:66.97},
+  {location:"Peshawar Crops",asset_type:"Crops",value:4800000,latitude:34.01,longitude:71.58},
+  {location:"Charsadda Irrigation",asset_type:"Irrigation",value:2100000,latitude:34.15,longitude:71.74},
+  {location:"Muzaffargarh Soil",asset_type:"Soil",value:1250000,latitude:30.07,longitude:71.19},
+  {location:"Ghotki Rice-Cotton",asset_type:"Crops",value:8900000,latitude:28.00,longitude:69.32},
+  {location:"Kashmore Livestock",asset_type:"Livestock",value:4100000,latitude:28.43,longitude:69.58},
+  {location:"Shikarpur Canal",asset_type:"Irrigation",value:1750000,latitude:27.96,longitude:68.64},
+  {location:"Nawabshah Crops",asset_type:"Crops",value:7600000,latitude:26.24,longitude:68.41},
+  {location:"Umerkot Farm",asset_type:"Crops",value:5200000,latitude:25.36,longitude:69.74}
+];
+const VULN_ICO={Crops:'🌾',Livestock:'🐄',Irrigation:'💧',Soil:'🌍',Machinery:'⚙',Storage:'📦',Fisheries:'🐟'};
+
+function process(data){assets=data.map(d=>{const risk=calc(d);return{...d,risk,band:band(risk),weight:w(d.asset_type)}});render()}
+function fmt(v){if(v>=1e9)return(v/1e9).toFixed(2)+'B';if(v>=1e6)return(v/1e6).toFixed(0)+'M';if(v>=1e5)return(v/1e5).toFixed(1)+'L';return v.toLocaleString()}
+
+function render(){
+  const totVal=assets.reduce((s,a)=>s+a.value,0);
+  const high=assets.filter(a=>a.risk>=56);
+  const varSum=high.reduce((s,a)=>s+a.value,0);
+  const avg=assets.length?Math.round(assets.reduce((s,a)=>s+a.risk,0)/assets.length):0;
+
+  document.getElementById('kpiAssets').textContent=fmt(totVal);
+  document.getElementById('kpiVaR').textContent=fmt(varSum);
+  document.getElementById('kpiHigh').textContent=high.length;
+  document.getElementById('kpiHazard').textContent='Flood';
+  document.getElementById('critBadge').style.display=assets.some(a=>a.risk>=86)?'flex':'none';
+
+  // Reports KPIs
+  document.getElementById('rptFarms').textContent=assets.length;
+  document.getElementById('rptAvg').textContent=avg;
+  document.getElementById('rptVaR').textContent=fmt(varSum);
+  document.getElementById('rptScen').textContent=scenario==='historical'?'Hist 2022':scenario.toUpperCase();
+
+  // Vulnerability
+  const byType={};
+  assets.forEach(a=>{if(!byType[a.asset_type])byType[a.asset_type]={sum:0,n:0};byType[a.asset_type].sum+=a.risk;byType[a.asset_type].n++});
+  const ranks=Object.entries(byType).map(([k,v])=>({type:k,avg:Math.round(v.sum/v.n),idx:(v.sum/v.n/100).toFixed(2),n:v.n})).sort((a,b)=>b.avg-a.avg);
+
+  document.getElementById('vulnList').innerHTML=ranks.slice(0,5).map(r=>{
+    const b=band(r.avg);
+    return`<div class="vuln-item"><span class="v-ico">${VULN_ICO[r.type]||'●'}</span><span class="v-name">${r.type}</span><span class="v-idx" style="color:${b.c}">${r.idx}</span><div class="v-bar"><div class="v-fill" style="width:${r.avg}%;background:${b.c}"></div></div></div>`;
+  }).join('');
+
+  document.getElementById('rankList').innerHTML=ranks.map(r=>{
+    const b=band(r.avg);
+    return`<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--border)"><div><strong>${r.type}</strong> <span style="color:var(--muted);font-size:.72rem">· ${r.n} farms</span></div><div style="display:flex;gap:8px;align-items:center"><span class="band-tag" style="background:${b.c}22;color:${b.c}">${b.n}</span><strong>${r.avg}</strong></div></div>`;
+  }).join('');
+
+  document.getElementById('assetTable').innerHTML=assets.map(a=>`<tr><td>${a.location}</td><td>${a.asset_type}</td><td>${fmt(a.value)}</td><td>${(+a.latitude).toFixed(2)}</td><td>${(+a.longitude).toFixed(2)}</td><td>${a.weight}</td><td><strong>${a.risk}</strong></td><td><span class="band-tag" style="background:${a.band.c}22;color:${a.band.c}">${a.band.n}</span></td></tr>`).join('');
+  document.getElementById('rptTable').innerHTML=assets.map(a=>`<tr><td>${a.location}</td><td>${a.asset_type}</td><td>${fmt(a.value)}</td><td><strong>${a.risk}</strong></td><td><span class="band-tag" style="background:${a.band.c}22;color:${a.band.c}">${a.band.n}</span></td></tr>`).join('');
+
+  // Maps
+  initMap('map',false);
+  updateMarkers(map,layer);
+
+  // Forecast cards + chart
+  updateForecasts();
+}
+
+// ── Map state ──
+let showHeat=false, showFlood=false, useSat=false;
+let heatLayer=null, floodLayer=null;
+let darkTile=null, satTile=null;
+
+const FLOOD_ZONE={type:'Feature',properties:{name:'Indus flood-prone zone'},geometry:{type:'Polygon',coordinates:[[[67.5,24.2],[68.2,24],[69,24.3],[70,24.8],[70.8,25.5],[71.5,26.5],[71.8,27.5],[71.6,28.5],[71.2,29.5],[70.5,30.2],[69.8,30.8],[69,31],[68.2,30.5],[67.8,29.5],[67.5,28.5],[67.3,27.5],[67.2,26.5],[67.3,25.5],[67.5,24.2]]]}};
+
+function buildPopup(a){
+  return `<div class="popup-title">${a.location}</div>
+    <div class="popup-meta">${VULN_ICO[a.asset_type]||'●'} ${a.asset_type} · Wt ${a.weight} · ${fmt(a.value)}</div>
+    <div class="popup-row"><strong>Risk ${a.risk}</strong>
+      <span class="band-tag" style="background:${a.band.c}22;color:${a.band.c}">${a.band.n}</span></div>
+    <div class="popup-bar"><div class="popup-fill" style="width:${a.risk}%;background:${a.band.c}"></div></div>`;
+}
+
+function markerIcon(a){
+  const crit=a.risk>=86;
+  return L.divIcon({
+    className:'',
+    html:`<div class="af-blob${crit?' crit':''}" style="background:${a.band.c};color:${a.band.c}"><div class="core"></div></div>`,
+    iconSize:[28,28],
+    iconAnchor:[14,14],
+    popupAnchor:[0,-12]
+  });
+}
+
+function initMap(id,isFull){
+  if(id==='map'&&map)return;
+  if(id==='mapFull'&&mapFull)return;
+  const m=L.map(id,{preferCanvas:true,zoomControl:false}).setView([29.5,69.0],6);
+  L.control.zoom({position:'bottomright'}).addTo(m);
+  // Public tiles — no API key required
+  const light=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}',{
+    attribution:'Tiles © Esri', maxZoom:16
+  });
+  const dark=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',{
+    attribution:'Tiles © Esri', maxZoom:16
+  });
+  const sat=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{
+    attribution:'© Esri', maxZoom:18
+  });
+  light.addTo(m);
+  const l=L.layerGroup().addTo(m);
+  if(id==='map'){map=m;layer=l;darkTile=dark;satTile=sat;window._lightTile=light}
+  else{mapFull=m;layerFull=l}
+}
+
+function updateMarkers(m,l){
+  if(!m||!l)return;
+  l.clearLayers();
+  if(heatLayer&&m.hasLayer(heatLayer)){m.removeLayer(heatLayer);heatLayer=null}
+  const heatData=[];
+  assets.forEach(a=>{
+    const marker=L.marker([a.latitude,a.longitude],{icon:markerIcon(a)})
+      .bindPopup(buildPopup(a));
+    marker.addTo(l);
+    heatData.push([a.latitude,a.longitude,a.risk/100]);
+  });
+  if(showHeat&&heatData.length&&m===map){
+    heatLayer=L.heatLayer(heatData,{
+      radius:30,blur:22,maxZoom:10,
+      gradient:{0.2:'#8ec4a8',0.4:'#9b8ec4',0.55:'#e8d08a',0.75:'#e8b47a',1:'#e87a8a'}
+    }).addTo(m);
+  }
+  if(assets.length){try{m.fitBounds(L.latLngBounds(assets.map(a=>[a.latitude,a.longitude])).pad(.15))}catch(e){}}
+}
+
+function toggleFlood(m){
+  if(!m)return;
+  if(!floodLayer){
+    floodLayer=L.geoJSON(FLOOD_ZONE,{style:{color:'#e8a0bf',weight:1.5,fillColor:'#e8a0bf',fillOpacity:0.1,dashArray:'5 4'}});
+  }
+  if(showFlood){if(!m.hasLayer(floodLayer))floodLayer.addTo(m)}
+  else{if(m.hasLayer(floodLayer))m.removeLayer(floodLayer)}
+}
+
+function bindMapTools(){
+  const heatBtn=document.getElementById('btnHeat');
+  const floodBtn=document.getElementById('btnFlood');
+  const satBtn=document.getElementById('btnSat');
+  if(heatBtn)heatBtn.onclick=()=>{showHeat=!showHeat;heatBtn.classList.toggle('on',showHeat);updateMarkers(map,layer)};
+  if(floodBtn)floodBtn.onclick=()=>{showFlood=!showFlood;floodBtn.classList.toggle('on',showFlood);toggleFlood(map)};
+  if(satBtn){
+    let baseMode=0; // 0 light (default), 1 dark, 2 sat
+    satBtn.textContent='Light';
+    satBtn.onclick=()=>{
+      if(!map||!darkTile||!satTile)return;
+      baseMode=(baseMode+1)%3;
+      [darkTile, window._lightTile, satTile].forEach(t=>{if(t&&map.hasLayer(t))map.removeLayer(t)});
+      if(baseMode===0){window._lightTile.addTo(map);satBtn.textContent='Light';satBtn.classList.remove('on')}
+      else if(baseMode===1){darkTile.addTo(map);satBtn.textContent='Dark';satBtn.classList.add('on')}
+      else{satTile.addTo(map);satBtn.textContent='Sat';satBtn.classList.add('on')}
+    };
+  }
+}
+
+function updateForecasts(){
+  const scenarios=['historical','ssp126','ssp245','ssp585'];
+  const horizons=['near','short','medium','long'];
+  const labels=['2030','2040','2060','2100'];
+  const colors=['#9b8ec4','#8ec4a8','#e8b47a','#e87a8a'];
+
+  // Cards: current scenario across horizons
+  document.getElementById('fcCards').innerHTML=horizons.map((h,i)=>{
+    let sum=0,n=0;
+    assets.forEach(a=>{
+      const wf=(w(a.asset_type)/55)*100,vf=Math.min(100,Math.log10((+a.value||0)+10)*11),lf=locFactor(+a.latitude||30);
+      let r=(wf*.6+vf*.2+lf*.2)*SCENARIO[scenario]*HORIZON[h];
+      sum+=Math.min(100,Math.max(0,Math.round(r)));n++;
+    });
+    const avg=n?Math.round(sum/n):0;
+    const b=band(avg);
+    return`<div class="fc-card"><div class="fc-label">${labels[i]}</div><div class="fc-val" style="color:${b.c}">${avg}</div><div class="fc-sub">Avg risk · ${b.n}</div></div>`;
+  }).join('');
+
+  // Chart: all scenarios
+  const datasets=scenarios.map((sc,i)=>{
+    const data=horizons.map(h=>{
+      let sum=0,n=0;
+      assets.forEach(a=>{
+        const wf=(w(a.asset_type)/55)*100,vf=Math.min(100,Math.log10((+a.value||0)+10)*11),lf=locFactor(+a.latitude||30);
+        let r=(wf*.6+vf*.2+lf*.2)*SCENARIO[sc]*HORIZON[h];
+        sum+=Math.min(100,Math.max(0,Math.round(r)));n++;
+      });
+      return n?Math.round(sum/n):0;
+    });
+    return{label:sc==='historical'?'Hist 2022':sc.toUpperCase(),data,borderColor:colors[i],backgroundColor:colors[i]+'22',tension:.3,fill:false};
+  });
+  const ctx=document.getElementById('forecastChart');
+  if(forecastChart)forecastChart.destroy();
+  forecastChart=new Chart(ctx,{type:'line',data:{labels,datasets},options:{responsive:true,plugins:{legend:{labels:{color:'#8490a4',font:{size:11}}}},scales:{y:{beginAtZero:true,max:100,ticks:{color:'#556070'},grid:{color:'rgba(255,255,255,.04)'}},x:{ticks:{color:'#556070'},grid:{display:false}}}}});
+}
+
+function exportCSV(){
+  const rows=[['Location','Asset Type','Value','Lat','Long','Weight','Risk','Band']];
+  assets.forEach(a=>rows.push([a.location,a.asset_type,a.value,a.latitude,a.longitude,a.weight,a.risk,a.band.n]));
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([rows.map(r=>r.join(',')).join('\n')],{type:'text/csv'}));a.download='agri-flood-export.csv';a.click();
+}
+
+// Top tabs — functional
+document.querySelectorAll('#hdrTabs button').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('#hdrTabs button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.tab-view').forEach(v=>v.classList.remove('active'));
+    document.querySelectorAll('.sb-view').forEach(v=>v.classList.remove('active'));
+    const tab=btn.dataset.tab;
+    document.getElementById('tab-'+tab).classList.add('active');
+    // Sync sidebar highlight for dashboard
+    document.querySelectorAll('.sb-nav button').forEach(b=>b.classList.toggle('active',b.dataset.sb==='dashboard'&&tab==='dashboard'));
+    if(tab==='dashboard'&&map)setTimeout(()=>map.invalidateSize(),60);
+    if(tab==='heatmaps'){
+      setTimeout(()=>{
+        initMap('mapFull',true);
+        updateMarkers(mapFull,layerFull);
+        if(mapFull)mapFull.invalidateSize();
+      },80);
+    }
+    if(tab==='forecasts')setTimeout(()=>{if(forecastChart)forecastChart.resize()},60);
+  });
+});
+
+// Sidebar nav
+document.querySelectorAll('.sb-nav button').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.sb-nav button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    const v=btn.dataset.sb;
+    if(v==='dashboard'){
+      document.querySelectorAll('.tab-view').forEach(t=>t.classList.remove('active'));
+      document.querySelectorAll('.sb-view').forEach(s=>s.classList.remove('active'));
+      document.getElementById('tab-dashboard').classList.add('active');
+      document.querySelectorAll('#hdrTabs button').forEach(b=>b.classList.toggle('active',b.dataset.tab==='dashboard'));
+      if(map)setTimeout(()=>map.invalidateSize(),60);
+    } else {
+      document.querySelectorAll('.tab-view').forEach(t=>t.classList.remove('active'));
+      document.querySelectorAll('.sb-view').forEach(s=>s.classList.remove('active'));
+      const el=document.getElementById('sb-'+v);
+      if(el)el.classList.add('active');
+    }
+  });
+});
+
+document.getElementById('viewComplete').addEventListener('click',e=>{
+  e.preventDefault();
+  document.querySelector('[data-sb=assets]').click();
+});
+
+// Scenario / horizon / run
+document.querySelectorAll('#scenarioPills .ssp-btn').forEach(b=>{
+  b.addEventListener('click',()=>{
+    document.querySelectorAll('#scenarioPills .ssp-btn').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');scenario=b.dataset.v;
+  });
+});
+document.getElementById('horizonSlider').addEventListener('input',e=>{horizon=HORIZON_KEYS[+e.target.value]});
+document.getElementById('runSim').addEventListener('click',()=>{
+  process(assets.map(a=>({location:a.location,asset_type:a.asset_type,value:a.value,latitude:a.latitude,longitude:a.longitude})));
+  const btn=document.getElementById('runSim');btn.textContent='✓ Updated';setTimeout(()=>btn.innerHTML='▶ Run Simulation',1100);
+});
+
+document.getElementById('csvFile').addEventListener('change',e=>{
+  const f=e.target.files[0];if(!f)return;
+  Papa.parse(f,{header:true,skipEmptyLines:true,complete:res=>{
+    process(res.data.map(r=>({
+      location:r.location||r.Location||r.name||'Unknown',
+      asset_type:r.asset_type||r.Asset_Type||r.type||'Crops',
+      value:+r.value||+r.Value||0,
+      latitude:+r.latitude||+r.lat||+r.Latitude||0,
+      longitude:+r.longitude||+r.lng||+r.long||+r.Longitude||0
+    })).filter(d=>d.latitude&&d.longitude));
+  }});
+});
+
+process(SAMPLE);
+bindMapTools();
+</script>
+</body>
+</html>
